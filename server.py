@@ -34,7 +34,7 @@ from starlette.templating import Jinja2Templates
 ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-HERMES_HOME = os.environ.get("HERMES_HOME", str(Path.home() / ".hermes"))
+HERMES_HOME = "/data/.hermes"
 ENV_FILE = Path(HERMES_HOME) / ".env"
 PAIRING_DIR = Path(HERMES_HOME) / "pairing"
 PAIRING_TTL = 3600
