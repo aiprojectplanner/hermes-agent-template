@@ -126,7 +126,12 @@ def write_config_yaml(data: dict[str, str]) -> None:
     config_path.write_text(f"""\
 model:
   default: "{model}"
-  provider: "auto"
+  provider: "openrouter"
+
+auxiliary:
+  compression:
+    provider: "openrouter"
+    model: "{model}"
 
 terminal:
   backend: "local"
