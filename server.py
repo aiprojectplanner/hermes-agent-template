@@ -117,6 +117,18 @@ def read_env(path: Path) -> dict[str, str]:
         out[k.strip()] = v
     return out
 
+# Load persisted Hermes env into the current process environment
+if ENV_FILE.exists():
+    for k, v in read_env(ENV_FILE).items():
+        if v:
+            os.environ[k] = v
+
+print(
+    f"[startup-env] OPENROUTER={'set' if os.environ.get('OPENROUTER_API_KEY') else 'missing'} "
+    f"LLM_PROVIDER={os.environ.get('LLM_PROVIDER')} "
+    f"AUX_PROVIDER={os.environ.get('AUXILIARY_LLM_PROVIDER')}",
+    flush=True,
+)
 
 def write_config_yaml(data: dict[str, str]) -> None:
     """Write a minimal config.yaml so hermes picks up the model and provider."""
