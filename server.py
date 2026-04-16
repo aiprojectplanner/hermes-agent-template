@@ -51,6 +51,7 @@ else:
 # (key, label, category, is_secret)
 ENV_VARS = [
     ("LLM_MODEL",               "Model",                    "model",     False),
+    ("AUX_MODEL",               "Aux Model (compression)",  "model",     False),  # ← 新增
     ("OPENROUTER_API_KEY",       "OpenRouter",               "provider",  True),
     ("DEEPSEEK_API_KEY",         "DeepSeek",                 "provider",  True),
     ("DASHSCOPE_API_KEY",        "DashScope",                "provider",  True),
@@ -130,9 +131,10 @@ print(
     flush=True,
 )
 
+
 def write_config_yaml(data: dict[str, str]) -> None:
-    """Write a minimal config.yaml so hermes picks up the model and provider."""
     model = data.get("LLM_MODEL", "")
+    aux_model = data.get("AUX_MODEL", "") or "google/gemini-2.0-flash-001"  # ← 新增这行
     config_path = Path(HERMES_HOME) / "config.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(f"""\
@@ -143,7 +145,7 @@ model:
 auxiliary:
   compression:
     provider: "openrouter"
-    model: "{model}"
+    model: "{aux_model}"  # ← 改用 aux_model
 
 terminal:
   backend: "local"
