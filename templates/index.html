@@ -850,18 +850,48 @@
         <!-- Disabled Skills -->
         <div class="section-label">
           Disabled Skills
-          <span class="req-note">— optional, save tokens by hiding unused skills</span>
+          <span class="req-note">— check to exclude from the agent's prompt index (saves tokens)</span>
         </div>
         <div class="card">
-          <label class="field-label">Skill names to exclude from the agent's prompt</label>
-          <textarea
-                    :value="vars.DISABLED_SKILLS||''"
-                    @input="vars.DISABLED_SKILLS=$event.target.value"
-                    placeholder="apple, gaming, smart-home, gifs"></textarea>
-          <p class="hint">Comma-separated skill names (matching each skill's frontmatter <code>name</code>).
-            To see installed skill names: SSH into the container and run <code>hermes skills list</code>,
-            or send <code>/skills list</code> in chat. Disabled skills stay on disk and are reversible —
-            just remove them from this list and Save.</p>
+          <template x-if="availableSkills.length === 0">
+            <p class="hint">No skill metadata available yet. Start the gateway at least once
+              (Save &amp; Restart above), then refresh this page. Hermes builds the skill snapshot
+              when it first assembles a system prompt.</p>
+          </template>
+
+          <template x-if="availableSkills.length > 0">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12px;color:var(--text-dim);">
+                <span><span x-text="availableSkills.length"></span> skills available · <span x-text="disabledCount"></span> disabled</span>
+                <button class="btn sm" type="button" @click="vars.DISABLED_SKILLS=''" :disabled="disabledCount===0">Clear all</button>
+              </div>
+              <template x-for="(skills, category) in skillsByCategory" :key="category">
+                <div style="margin-bottom:14px;">
+                  <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);padding-bottom:4px;border-bottom:1px solid var(--border);margin-bottom:6px;">
+                    <span x-text="category"></span>
+                    <span style="opacity:0.6;">(<span x-text="skills.length"></span>)</span>
+                  </div>
+                  <template x-for="s in skills" :key="s.name">
+                    <label style="display:flex;gap:10px;padding:5px 0;cursor:pointer;align-items:flex-start;">
+                      <input type="checkbox" style="margin-top:3px;flex-shrink:0;"
+                             :checked="isSkillDisabled(s.name)"
+                             @change="toggleSkillDisabled(s.name)">
+                      <div style="min-width:0;flex:1;">
+                        <div style="font-family:var(--font-mono);font-size:13px;" x-text="s.name"></div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-top:2px;" x-show="s.description" x-text="s.description"></div>
+                      </div>
+                    </label>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <p class="hint" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+            Disabled skills stay on disk &amp; are reversible — uncheck to re-enable.
+            Stored as <code>DISABLED_SKILLS</code> CSV in <code>.env</code>.
+            Save &amp; Restart for changes to take effect.
+          </p>
         </div>
 
         <!-- Provider API Keys -->
@@ -1304,6 +1334,7 @@ function app() {
     gw: {},
     status: {},
     hermesStatus: { main: {}, aux: {}, gateway_state: '' },
+    availableSkills: [],
     logs: [],
     pending: [],
     approved: [],
@@ -1342,6 +1373,27 @@ function app() {
       return !!(this.vars.LLM_MODEL && keys.some(k => this.vars[k]));
     },
 
+    get disabledSkillSet() {
+      return new Set(
+        (this.vars.DISABLED_SKILLS || '').split(',')
+          .map(s => s.trim()).filter(Boolean)
+      );
+    },
+    get disabledCount() { return this.disabledSkillSet.size; },
+    get skillsByCategory() {
+      const groups = {};
+      for (const s of this.availableSkills) {
+        (groups[s.category] = groups[s.category] || []).push(s);
+      }
+      return groups;
+    },
+    isSkillDisabled(name) { return this.disabledSkillSet.has(name); },
+    toggleSkillDisabled(name) {
+      const set = this.disabledSkillSet;
+      if (set.has(name)) set.delete(name); else set.add(name);
+      this.vars.DISABLED_SKILLS = [...set].sort().join(',');
+    },
+
     clearChannel(ch) {
       const keysMap = {
         telegram:   ['TELEGRAM_BOT_TOKEN','TELEGRAM_ALLOWED_USERS'],
@@ -1361,7 +1413,7 @@ function app() {
     },
 
     async init() {
-      await Promise.all([this.loadConfig(), this.loadStatus(), this.loadHermesStatus(), this.loadLogs(), this.loadPairing()]);
+      await Promise.all([this.loadConfig(), this.loadStatus(), this.loadHermesStatus(), this.loadAvailableSkills(), this.loadLogs(), this.loadPairing()]);
       setInterval(() => this.loadStatus(),       5000);
       setInterval(() => this.loadHermesStatus(), 5000);
       setInterval(() => this.loadLogs(),         3000);
@@ -1400,7 +1452,7 @@ function app() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ vars: { ...this.vars }, _restart: this.restartOnSave }),
         });
-        if (r.ok) { this.notify('Saved', true); await this.loadConfig(); await this.loadHermesStatus(); }
+        if (r.ok) { this.notify('Saved', true); await this.loadConfig(); await this.loadHermesStatus(); await this.loadAvailableSkills(); }
         else { const e = await r.json().catch(()=>{}); this.notify(e?.error||'Save failed', false); }
       } catch(e) { this.notify('Save failed: '+e.message, false); }
       this.saving = false;
@@ -1430,6 +1482,13 @@ function app() {
       try {
         const r = await fetch('/api/hermes-status');
         if (r.ok) this.hermesStatus = await r.json();
+      } catch {}
+    },
+
+    async loadAvailableSkills() {
+      try {
+        const r = await fetch('/api/available-skills');
+        if (r.ok) this.availableSkills = (await r.json()).skills || [];
       } catch {}
     },
 
