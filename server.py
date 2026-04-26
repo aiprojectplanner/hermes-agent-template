@@ -50,10 +50,15 @@ else:
 # ── Env var registry ──────────────────────────────────────────────────────────
 # (key, label, category, is_secret)
 ENV_VARS = [
+    ("LLM_PROVIDER",            "Provider",                 "model",     False),
     ("LLM_MODEL",               "Model",                    "model",     False),
-    ("AUX_MODEL",               "Aux Model (compression)",  "model",     False),  # ← 新增
+    ("AUX_PROVIDER",            "Aux Provider",             "model",     False),
+    ("AUX_MODEL",               "Aux Model (compression)",  "model",     False),
     ("OPENROUTER_API_KEY",       "OpenRouter",               "provider",  True),
     ("DEEPSEEK_API_KEY",         "DeepSeek",                 "provider",  True),
+    ("ANTHROPIC_API_KEY",        "Anthropic (Claude)",       "provider",  True),
+    ("OPENAI_API_KEY",           "OpenAI",                   "provider",  True),
+    ("XAI_API_KEY",              "xAI (Grok)",               "provider",  True),
     ("DASHSCOPE_API_KEY",        "DashScope",                "provider",  True),
     ("GLM_API_KEY",              "GLM / Z.AI",               "provider",  True),
     ("KIMI_API_KEY",             "Kimi",                     "provider",  True),
@@ -127,30 +132,58 @@ if ENV_FILE.exists():
 print(
     f"[startup-env] OPENROUTER={'set' if os.environ.get('OPENROUTER_API_KEY') else 'missing'} "
     f"LLM_PROVIDER={os.environ.get('LLM_PROVIDER')} "
-    f"AUX_PROVIDER={os.environ.get('AUXILIARY_LLM_PROVIDER')}",
+    f"AUX_PROVIDER={os.environ.get('AUX_PROVIDER')}",
     flush=True,
 )
 
 
 def write_config_yaml(data: dict[str, str]) -> None:
+    """Render config.yaml from .env. Provider/aux_provider/terminal_cwd are now
+    driven by env vars (with sensible fallbacks) instead of being hardcoded."""
     model = data.get("LLM_MODEL", "")
-    aux_model = data.get("AUX_MODEL", "") or "google/gemini-2.0-flash-001"  # ← 新增这行
+    aux_model = data.get("AUX_MODEL", "") or "google/gemini-2.0-flash-001"
+
+    # Provider: prefer .env value, then process env (Railway vars), then default
+    provider = (
+        data.get("LLM_PROVIDER", "").strip()
+        or os.environ.get("LLM_PROVIDER", "").strip()
+        or "openrouter"
+    )
+    # Aux provider: same precedence; if still unset, mirror the main provider
+    aux_provider = (
+        data.get("AUX_PROVIDER", "").strip()
+        or os.environ.get("AUX_PROVIDER", "").strip()
+        or provider
+    )
+    # Terminal cwd: avoid /tmp (where AGENTS.md from hermes install can leak
+    # into agent context). Default to a per-instance workspace dir.
+    terminal_cwd = (
+        data.get("TERMINAL_CWD", "").strip()
+        or os.environ.get("TERMINAL_CWD", "").strip()
+        or "/data/workspace"
+    )
+
     config_path = Path(HERMES_HOME) / "config.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        Path(terminal_cwd).mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+
     config_path.write_text(f"""\
 model:
   default: "{model}"
-  provider: "openrouter"
+  provider: "{provider}"
 
 auxiliary:
   compression:
-    provider: "openrouter"
-    model: "{aux_model}"  # ← 改用 aux_model
+    provider: "{aux_provider}"
+    model: "{aux_model}"
 
 terminal:
   backend: "local"
   timeout: 60
-  cwd: "/tmp"
+  cwd: "{terminal_cwd}"
 
 agent:
   max_iterations: 50
@@ -375,6 +408,44 @@ async def api_logs(request: Request):
     return JSONResponse({"lines": list(gw.logs)})
 
 
+def _read_active_config() -> dict:
+    """Parse the small subset of config.yaml we care about (provider/model for
+    main and aux). Avoids a PyYAML dep — we wrote this file ourselves so the
+    shape is fixed."""
+    path = Path(HERMES_HOME) / "config.yaml"
+    out = {"main": {"provider": None, "model": None},
+           "aux":  {"provider": None, "model": None}}
+    if not path.exists():
+        return out
+    section = None
+    for raw in path.read_text().splitlines():
+        if not raw.startswith(" ") and raw.strip():
+            head = raw.split(":", 1)[0].strip()
+            section = "main" if head == "model" else "aux" if head == "auxiliary" else None
+            continue
+        if section is None:
+            continue
+        s = raw.strip()
+        if section == "main":
+            if s.startswith("default:"):
+                out["main"]["model"] = s.split(":", 1)[1].strip().strip('"')
+            elif s.startswith("provider:"):
+                out["main"]["provider"] = s.split(":", 1)[1].strip().strip('"')
+        elif section == "aux":
+            if s.startswith("provider:"):
+                out["aux"]["provider"] = s.split(":", 1)[1].strip().strip('"')
+            elif s.startswith("model:"):
+                out["aux"]["model"] = s.split(":", 1)[1].strip().strip('"')
+    return out
+
+
+async def api_hermes_status(request: Request):
+    if err := guard(request): return err
+    cfg = _read_active_config()
+    cfg["gateway_state"] = gw.state
+    return JSONResponse(cfg)
+
+
 async def api_gw_start(request: Request):
     if err := guard(request): return err
     asyncio.create_task(gw.start())
@@ -515,6 +586,7 @@ routes = [
     Route("/api/config",                api_config_get,      methods=["GET"]),
     Route("/api/config",                api_config_put,      methods=["PUT"]),
     Route("/api/status",                api_status),
+    Route("/api/hermes-status",         api_hermes_status),
     Route("/api/logs",                  api_logs),
     Route("/api/gateway/start",         api_gw_start,        methods=["POST"]),
     Route("/api/gateway/stop",          api_gw_stop,         methods=["POST"]),

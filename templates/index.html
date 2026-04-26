@@ -742,35 +742,101 @@
           New to Hermes? Head over to the <a href="#" @click.prevent="page='guide'" style="color:var(--accent2);text-decoration:none;font-weight:500;">How to Setup</a> section for a step-by-step guide on getting started.
         </div>
 
-        <!-- LLM Provider -->
+        <!-- LLM Configuration -->
         <div class="section-label">
-          LLM Provider
+          LLM Configuration
           <span class="req-note">* required</span>
         </div>
+
+        <div class="field-grid-2" style="margin-bottom:12px;">
+          <!-- Main Model -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title">Main Model</div>
+            <div>
+              <label class="field-label">Provider</label>
+              <select x-model="vars.LLM_PROVIDER">
+                <option value="">— Select provider —</option>
+                <template x-for="(p, name) in providerMap" :key="name">
+                  <option :value="p.provider" x-text="name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="field-gap">
+              <label class="field-label">Model</label>
+              <input type="text" :value="vars.LLM_MODEL||''"
+                     @input="vars.LLM_MODEL=$event.target.value"
+                     placeholder="e.g. claude-sonnet-4-5 or deepseek/deepseek-chat">
+              <p class="hint">Direct API: bare name (e.g. <code>claude-sonnet-4-5</code>). Via OpenRouter: <code>provider/model</code></p>
+            </div>
+          </div>
+
+          <!-- Aux Model -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-title">Aux Model <span style="opacity:0.5;font-size:0.85em;font-weight:400;">(compression)</span></div>
+            <div>
+              <label class="field-label">Provider</label>
+              <select x-model="vars.AUX_PROVIDER">
+                <option value="">— Same as main —</option>
+                <template x-for="(p, name) in providerMap" :key="name">
+                  <option :value="p.provider" x-text="name"></option>
+                </template>
+              </select>
+            </div>
+            <div class="field-gap">
+              <label class="field-label">Model</label>
+              <input type="text" :value="vars.AUX_MODEL||''"
+                     @input="vars.AUX_MODEL=$event.target.value"
+                     placeholder="e.g. google/gemini-2.0-flash-001">
+              <p class="hint">Lightweight model for context compression. Default: <code>google/gemini-2.0-flash-001</code></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Currently Active status -->
+        <div class="card" style="background:rgba(63,185,80,0.04);border-color:rgba(63,185,80,0.25);">
+          <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);"></span>
+            Currently Active
+            <span style="margin-left:auto;font-size:11px;color:var(--text-dim);font-weight:400;font-family:var(--font-mono);"
+                  x-text="hermesStatus.gateway_state ? 'gateway: '+hermesStatus.gateway_state : ''"></span>
+          </div>
+          <div class="field-grid-2">
+            <div>
+              <label class="field-label">Main</label>
+              <div style="font-family:var(--font-mono);font-size:13px;">
+                <span x-text="(hermesStatus.main && hermesStatus.main.provider) || '—'"></span>
+                <span style="color:var(--text-dim);"> / </span>
+                <span x-text="(hermesStatus.main && hermesStatus.main.model) || '—'"></span>
+              </div>
+            </div>
+            <div>
+              <label class="field-label">Aux</label>
+              <div style="font-family:var(--font-mono);font-size:13px;">
+                <span x-text="(hermesStatus.aux && hermesStatus.aux.provider) || '—'"></span>
+                <span style="color:var(--text-dim);"> / </span>
+                <span x-text="(hermesStatus.aux && hermesStatus.aux.model) || '—'"></span>
+              </div>
+            </div>
+          </div>
+          <p class="hint" style="margin-top:10px;">Reads <code>config.yaml</code>. Save &amp; Restart to activate changes.</p>
+        </div>
+
+        <!-- Provider API Keys -->
+        <div class="section-label">
+          Provider API Keys
+          <span class="req-note">— enter keys for the providers you selected</span>
+        </div>
         <div class="card">
-          <div>
-            <label class="field-label">Provider</label>
-            <select x-model="selectedProvider" @change="onProviderChange()">
-              <option value="">— Select provider —</option>
-              <template x-for="(p, name) in providerMap" :key="name">
-                <option :value="name" x-text="name"></option>
-              </template>
-            </select>
-          </div>
-
-
-        <div class="field-gap" x-show="selectedProvider">
-            <label class="field-label">LLM Model</label>
-            <input type="text" :value="vars.LLM_MODEL||''" @input="vars.LLM_MODEL=$event.target.value"
-                   placeholder="e.g. openai/gpt-4o-mini  or  deepseek/deepseek-chat">
-            <p class="hint">OpenRouter format: <code>provider/model-name</code></p>
-          </div>
-
-          <div class="field-gap" x-show="selectedProvider">
-            <label class="field-label">Aux Model <span style="opacity:0.5;font-size:0.85em">(compression)</span></label>
-            <input type="text" :value="vars.AUX_MODEL||''" @input="vars.AUX_MODEL=$event.target.value"
-                   placeholder="e.g. google/gemini-2.0-flash-001">
-            <p class="hint">Lightweight model for context compression. Leave empty to use <code>google/gemini-2.0-flash-001</code></p>
+          <div class="field-grid-2">
+            <template x-for="(p, name) in providerMap" :key="name">
+              <div>
+                <label class="field-label" x-text="name"></label>
+                <input type="password"
+                       :value="vars[p.key]||''"
+                       @input="vars[p.key]=$event.target.value"
+                       :placeholder="p.placeholder">
+              </div>
+            </template>
           </div>
         </div>
 
@@ -1194,6 +1260,7 @@ function app() {
     vars: {},
     gw: {},
     status: {},
+    hermesStatus: { main: {}, aux: {}, gateway_state: '' },
     logs: [],
     pending: [],
     approved: [],
@@ -1202,17 +1269,21 @@ function app() {
 
     tools,
 
+    // Each entry: display label → { key: env var holding API key,
+    //                                provider: hermes provider name (config.yaml value),
+    //                                placeholder: input hint }
     providerMap: {
-      'OpenRouter':  { key: 'OPENROUTER_API_KEY',  placeholder: 'sk-or-...' },
-      'DeepSeek':    { key: 'DEEPSEEK_API_KEY',     placeholder: 'sk-...'    },
-      'DashScope':   { key: 'DASHSCOPE_API_KEY',    placeholder: ''          },
-      'GLM / Z.AI':  { key: 'GLM_API_KEY',          placeholder: ''          },
-      'Kimi':        { key: 'KIMI_API_KEY',          placeholder: ''          },
-      'MiniMax':     { key: 'MINIMAX_API_KEY',       placeholder: ''          },
-      'HuggingFace': { key: 'HF_TOKEN',              placeholder: 'hf_...'   },
+      'OpenRouter':         { key: 'OPENROUTER_API_KEY', provider: 'openrouter',   placeholder: 'sk-or-...'  },
+      'DeepSeek':           { key: 'DEEPSEEK_API_KEY',   provider: 'deepseek',     placeholder: 'sk-...'     },
+      'Anthropic (Claude)': { key: 'ANTHROPIC_API_KEY',  provider: 'anthropic',    placeholder: 'sk-ant-...' },
+      'OpenAI':             { key: 'OPENAI_API_KEY',     provider: 'openai',       placeholder: 'sk-...'     },
+      'xAI (Grok)':         { key: 'XAI_API_KEY',        provider: 'xai',          placeholder: 'xai-...'    },
+      'DashScope':          { key: 'DASHSCOPE_API_KEY',  provider: 'alibaba',      placeholder: ''           },
+      'GLM / Z.AI':         { key: 'GLM_API_KEY',        provider: 'zai',          placeholder: ''           },
+      'Kimi':               { key: 'KIMI_API_KEY',       provider: 'kimi-coding',  placeholder: ''           },
+      'MiniMax':            { key: 'MINIMAX_API_KEY',    provider: 'minimax',      placeholder: ''           },
+      'HuggingFace':        { key: 'HF_TOKEN',           provider: 'huggingface',  placeholder: 'hf_...'     },
     },
-
-    selectedProvider: '',
 
     channelsEnabled: {
       telegram: false, discord: false, slack: false,
@@ -1226,13 +1297,6 @@ function app() {
     get isSetupDone() {
       const keys = Object.values(this.providerMap).map(p => p.key);
       return !!(this.vars.LLM_MODEL && keys.some(k => this.vars[k]));
-    },
-
-    onProviderChange() {
-      // Clear keys from other providers when switching
-      for (const [name, p] of Object.entries(this.providerMap)) {
-        if (name !== this.selectedProvider) this.vars[p.key] = '';
-      }
     },
 
     clearChannel(ch) {
@@ -1254,10 +1318,11 @@ function app() {
     },
 
     async init() {
-      await Promise.all([this.loadConfig(), this.loadStatus(), this.loadLogs(), this.loadPairing()]);
-      setInterval(() => this.loadStatus(),  5000);
-      setInterval(() => this.loadLogs(),    3000);
-      setInterval(() => this.loadPairing(), 5000);
+      await Promise.all([this.loadConfig(), this.loadStatus(), this.loadHermesStatus(), this.loadLogs(), this.loadPairing()]);
+      setInterval(() => this.loadStatus(),       5000);
+      setInterval(() => this.loadHermesStatus(), 5000);
+      setInterval(() => this.loadLogs(),         3000);
+      setInterval(() => this.loadPairing(),      5000);
     },
 
     async loadConfig() {
@@ -1266,10 +1331,6 @@ function app() {
         if (r.ok) {
           const d = await r.json();
           this.vars = d.vars || {};
-          // Detect active provider
-          for (const [name, p] of Object.entries(this.providerMap)) {
-            if (this.vars[p.key]) { this.selectedProvider = name; break; }
-          }
           // Detect active channels
           this.channelsEnabled = {
             telegram:   !!(this.vars.TELEGRAM_BOT_TOKEN),
@@ -1296,7 +1357,7 @@ function app() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ vars: { ...this.vars }, _restart: this.restartOnSave }),
         });
-        if (r.ok) { this.notify('Saved', true); await this.loadConfig(); }
+        if (r.ok) { this.notify('Saved', true); await this.loadConfig(); await this.loadHermesStatus(); }
         else { const e = await r.json().catch(()=>{}); this.notify(e?.error||'Save failed', false); }
       } catch(e) { this.notify('Save failed: '+e.message, false); }
       this.saving = false;
@@ -1307,7 +1368,7 @@ function app() {
       const r = await fetch('/api/config/reset', { method: 'POST' });
       if (r.ok) {
         await this.loadConfig();
-        this.selectedProvider = '';
+        await this.loadHermesStatus();
         this.page = 'setup';
         this.notify('Config reset', true);
       } else {
@@ -1319,6 +1380,13 @@ function app() {
       try {
         const r = await fetch('/api/status');
         if (r.ok) { const d = await r.json(); this.status = d; this.gw = d.gateway||{}; }
+      } catch {}
+    },
+
+    async loadHermesStatus() {
+      try {
+        const r = await fetch('/api/hermes-status');
+        if (r.ok) this.hermesStatus = await r.json();
       } catch {}
     },
 
