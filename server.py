@@ -92,6 +92,10 @@ ENV_VARS = [
     ("MATRIX_HOMESERVER",        "Homeserver URL",           "matrix",    False),
     ("MATRIX_ACCESS_TOKEN",      "Access Token",             "matrix",    True),
     ("MATRIX_USER_ID",           "User ID",                  "matrix",    False),
+    ("FEISHU_APP_ID",            "App ID (cli_...)",         "feishu",    False),
+    ("FEISHU_APP_SECRET",        "App Secret",               "feishu",    True),
+    ("FEISHU_ALLOWED_USERS",     "Allowed User IDs",         "feishu",    False),
+    ("FEISHU_BOT_NAME",          "Bot Name (for @ mentions)","feishu",    False),
     ("GATEWAY_ALLOW_ALL_USERS",  "Allow all users",          "gateway",   False),
     ("ADMIN_USERNAME",           "Admin username",           "admin",     False),
     ("ADMIN_PASSWORD",           "Admin password",           "admin",     True),
@@ -107,6 +111,7 @@ CHANNEL_MAP  = {
     "Email":       "EMAIL_ADDRESS",
     "Mattermost":  "MATTERMOST_TOKEN",
     "Matrix":      "MATRIX_ACCESS_TOKEN",
+    "Feishu":      "FEISHU_APP_ID",
 }
 
 
@@ -227,12 +232,12 @@ def write_env(path: Path, data: dict[str, str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     cat_order = ["model", "skills", "provider", "tool",
                  "telegram", "discord", "slack", "whatsapp",
-                 "email", "mattermost", "matrix", "gateway"]
+                 "email", "mattermost", "matrix", "feishu", "gateway"]
     cat_labels = {
         "model": "Model", "skills": "Skills", "provider": "Providers", "tool": "Tools",
         "telegram": "Telegram", "discord": "Discord", "slack": "Slack",
         "whatsapp": "WhatsApp", "email": "Email",
-        "mattermost": "Mattermost", "matrix": "Matrix", "gateway": "Gateway",
+        "mattermost": "Mattermost", "matrix": "Matrix", "feishu": "Feishu", "gateway": "Gateway",
     }
     key_cat = {k: c for k, _, c, _ in ENV_VARS}
     grouped: dict[str, list[str]] = {c: [] for c in cat_order}

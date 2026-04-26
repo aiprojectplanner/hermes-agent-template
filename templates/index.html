@@ -1001,6 +1001,22 @@
             </div>
           </div>
 
+          <!-- Feishu / Lark -->
+          <div class="toggle-row" @click="channelsEnabled.feishu=!channelsEnabled.feishu; if(!channelsEnabled.feishu) clearChannel('feishu')">
+            <input type="checkbox" :checked="channelsEnabled.feishu" @click.stop @change="channelsEnabled.feishu=$event.target.checked; if(!channelsEnabled.feishu) clearChannel('feishu')">
+            <span class="toggle-icon">🌸</span>
+            <span class="toggle-label">Feishu / Lark</span>
+            <span style="font-size:11px;color:var(--text-dim);margin-left:8px;">WebSocket mode (no public URL needed)</span>
+          </div>
+          <div class="toggle-body" x-show="channelsEnabled.feishu">
+            <div class="field-grid-2">
+              <div><label class="field-label">App ID</label><input type="text" :value="vars.FEISHU_APP_ID||''" @input="vars.FEISHU_APP_ID=$event.target.value" placeholder="cli_xxxxxxxxxxxxxx"></div>
+              <div><label class="field-label">App Secret</label><input type="password" :value="vars.FEISHU_APP_SECRET||''" @input="vars.FEISHU_APP_SECRET=$event.target.value"></div>
+              <div><label class="field-label">Allowed User IDs</label><input type="text" :value="vars.FEISHU_ALLOWED_USERS||''" @input="vars.FEISHU_ALLOWED_USERS=$event.target.value" placeholder="ou_xxx,ou_yyy or *"><p class="hint">User <code>open_id</code>s (start with <code>ou_</code>) — get from inbound event logs. Use <code>*</code> to allow all.</p></div>
+              <div><label class="field-label">Bot Name <span style="opacity:0.5;font-size:0.85em">(optional)</span></label><input type="text" :value="vars.FEISHU_BOT_NAME||''" @input="vars.FEISHU_BOT_NAME=$event.target.value" placeholder="lizi-helper"><p class="hint">For @mention detection in groups</p></div>
+            </div>
+          </div>
+
           <!-- WhatsApp -->
           <div class="toggle-row" style="border-bottom:none;" @click="channelsEnabled.whatsapp=!channelsEnabled.whatsapp; vars.WHATSAPP_ENABLED=channelsEnabled.whatsapp?'true':'false'">
             <input type="checkbox" :checked="channelsEnabled.whatsapp" @click.stop @change="channelsEnabled.whatsapp=$event.target.checked; vars.WHATSAPP_ENABLED=$event.target.checked?'true':'false'">
@@ -1361,7 +1377,7 @@ function app() {
 
     channelsEnabled: {
       telegram: false, discord: false, slack: false,
-      email: false, mattermost: false, matrix: false, whatsapp: false,
+      email: false, mattermost: false, matrix: false, feishu: false, whatsapp: false,
     },
 
     toolsEnabled: Object.fromEntries(tools.map(t => [t.key, false])),
@@ -1402,6 +1418,7 @@ function app() {
         email:      ['EMAIL_ADDRESS','EMAIL_PASSWORD','EMAIL_IMAP_HOST','EMAIL_SMTP_HOST'],
         mattermost: ['MATTERMOST_URL','MATTERMOST_TOKEN'],
         matrix:     ['MATRIX_HOMESERVER','MATRIX_ACCESS_TOKEN','MATRIX_USER_ID'],
+        feishu:     ['FEISHU_APP_ID','FEISHU_APP_SECRET','FEISHU_ALLOWED_USERS','FEISHU_BOT_NAME'],
         whatsapp:   ['WHATSAPP_ENABLED'],
       };
       for (const k of keysMap[ch] || []) this.vars[k] = '';
@@ -1434,6 +1451,7 @@ function app() {
             email:      !!(this.vars.EMAIL_ADDRESS),
             mattermost: !!(this.vars.MATTERMOST_URL),
             matrix:     !!(this.vars.MATRIX_HOMESERVER),
+            feishu:     !!(this.vars.FEISHU_APP_ID),
             whatsapp:   this.vars.WHATSAPP_ENABLED === 'true',
           };
           // Detect active tools
