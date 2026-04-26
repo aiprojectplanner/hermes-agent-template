@@ -261,7 +261,7 @@
     margin-bottom: 5px;
   }
 
-  input[type=text], input[type=password], select {
+  input[type=text], input[type=password], select, textarea {
     background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
@@ -273,7 +273,8 @@
     outline: none;
     transition: border-color 0.15s;
   }
-  input[type=text]:focus, input[type=password]:focus, select:focus { border-color: var(--accent); }
+  input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  textarea { min-height: 60px; resize: vertical; line-height: 1.5; }
   input::placeholder { color: var(--text-dim); opacity: 0.5; }
   input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
 
@@ -792,6 +793,31 @@
           </div>
         </div>
 
+        <!-- Audit Model (optional override) -->
+        <div class="card">
+          <div class="card-title">Audit Model
+            <span style="opacity:0.5;font-size:0.85em;font-weight:400;">(skill install audit · optional)</span>
+          </div>
+          <div class="field-grid-2">
+            <div>
+              <label class="field-label">Provider</label>
+              <select x-model="vars.AUDIT_PROVIDER">
+                <option value="">— Same as Aux —</option>
+                <template x-for="(p, name) in providerMap" :key="name">
+                  <option :value="p.provider" x-text="name"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">Model</label>
+              <input type="text" :value="vars.AUDIT_MODEL||''"
+                     @input="vars.AUDIT_MODEL=$event.target.value"
+                     placeholder="e.g. claude-haiku-4-5 (defaults to Aux model)">
+            </div>
+          </div>
+          <p class="hint">Used by post-install skill audit. Defaults to your Aux model. Pick a slightly stronger model (e.g. <code>claude-haiku-4-5</code>) when security stakes are higher.</p>
+        </div>
+
         <!-- Currently Active status -->
         <div class="card" style="background:rgba(63,185,80,0.04);border-color:rgba(63,185,80,0.25);">
           <div class="card-title" style="display:flex;align-items:center;gap:8px;">
@@ -819,6 +845,23 @@
             </div>
           </div>
           <p class="hint" style="margin-top:10px;">Reads <code>config.yaml</code>. Save &amp; Restart to activate changes.</p>
+        </div>
+
+        <!-- Disabled Skills -->
+        <div class="section-label">
+          Disabled Skills
+          <span class="req-note">— optional, save tokens by hiding unused skills</span>
+        </div>
+        <div class="card">
+          <label class="field-label">Skill names to exclude from the agent's prompt</label>
+          <textarea
+                    :value="vars.DISABLED_SKILLS||''"
+                    @input="vars.DISABLED_SKILLS=$event.target.value"
+                    placeholder="apple, gaming, smart-home, gifs"></textarea>
+          <p class="hint">Comma-separated skill names (matching each skill's frontmatter <code>name</code>).
+            To see installed skill names: SSH into the container and run <code>hermes skills list</code>,
+            or send <code>/skills list</code> in chat. Disabled skills stay on disk and are reversible —
+            just remove them from this list and Save.</p>
         </div>
 
         <!-- Provider API Keys -->

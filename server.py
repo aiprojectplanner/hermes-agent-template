@@ -54,6 +54,9 @@ ENV_VARS = [
     ("LLM_MODEL",               "Model",                    "model",     False),
     ("AUX_PROVIDER",            "Aux Provider",             "model",     False),
     ("AUX_MODEL",               "Aux Model (compression)",  "model",     False),
+    ("AUDIT_PROVIDER",          "Audit Provider",           "model",     False),
+    ("AUDIT_MODEL",             "Audit Model",              "model",     False),
+    ("DISABLED_SKILLS",         "Disabled Skills (CSV)",    "skills",    False),
     ("OPENROUTER_API_KEY",       "OpenRouter",               "provider",  True),
     ("DEEPSEEK_API_KEY",         "DeepSeek",                 "provider",  True),
     ("ANTHROPIC_API_KEY",        "Anthropic (Claude)",       "provider",  True),
@@ -138,8 +141,9 @@ print(
 
 
 def write_config_yaml(data: dict[str, str]) -> None:
-    """Render config.yaml from .env. Provider/aux_provider/terminal_cwd are now
-    driven by env vars (with sensible fallbacks) instead of being hardcoded."""
+    """Render config.yaml from .env. Provider/aux_provider/audit/terminal_cwd
+    are driven by env vars (with sensible fallbacks). The skills.disabled list
+    is sourced from the DISABLED_SKILLS CSV and only emitted when non-empty."""
     model = data.get("LLM_MODEL", "")
     aux_model = data.get("AUX_MODEL", "") or "google/gemini-2.0-flash-001"
 
@@ -155,6 +159,18 @@ def write_config_yaml(data: dict[str, str]) -> None:
         or os.environ.get("AUX_PROVIDER", "").strip()
         or provider
     )
+    # Audit model: defaults to mirroring aux (compression model is usually
+    # cheap/fast, fine for routine audit). Override for stronger security audit.
+    audit_provider = (
+        data.get("AUDIT_PROVIDER", "").strip()
+        or os.environ.get("AUDIT_PROVIDER", "").strip()
+        or aux_provider
+    )
+    audit_model = (
+        data.get("AUDIT_MODEL", "").strip()
+        or os.environ.get("AUDIT_MODEL", "").strip()
+        or aux_model
+    )
     # Terminal cwd: avoid /tmp (where AGENTS.md from hermes install can leak
     # into agent context). Default to a per-instance workspace dir.
     terminal_cwd = (
@@ -162,6 +178,12 @@ def write_config_yaml(data: dict[str, str]) -> None:
         or os.environ.get("TERMINAL_CWD", "").strip()
         or "/data/workspace"
     )
+    # Disabled skills: comma-separated list; empty → no skills.disabled block.
+    disabled_raw = (
+        data.get("DISABLED_SKILLS", "").strip()
+        or os.environ.get("DISABLED_SKILLS", "").strip()
+    )
+    disabled_skills = [s.strip() for s in disabled_raw.split(",") if s.strip()]
 
     config_path = Path(HERMES_HOME) / "config.yaml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,6 +191,12 @@ def write_config_yaml(data: dict[str, str]) -> None:
         Path(terminal_cwd).mkdir(parents=True, exist_ok=True)
     except OSError:
         pass
+
+    skills_block = ""
+    if disabled_skills:
+        skills_block = "skills:\n  disabled:\n" + "".join(
+            f"    - \"{name}\"\n" for name in disabled_skills
+        ) + "\n"
 
     config_path.write_text(f"""\
 model:
@@ -179,6 +207,9 @@ auxiliary:
   compression:
     provider: "{aux_provider}"
     model: "{aux_model}"
+  audit:
+    provider: "{audit_provider}"
+    model: "{audit_model}"
 
 terminal:
   backend: "local"
@@ -188,17 +219,17 @@ terminal:
 agent:
   max_iterations: 50
 
-data_dir: "{HERMES_HOME}"
+{skills_block}data_dir: "{HERMES_HOME}"
 """)
 
 
 def write_env(path: Path, data: dict[str, str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    cat_order = ["model", "provider", "tool",
+    cat_order = ["model", "skills", "provider", "tool",
                  "telegram", "discord", "slack", "whatsapp",
                  "email", "mattermost", "matrix", "gateway"]
     cat_labels = {
-        "model": "Model", "provider": "Providers", "tool": "Tools",
+        "model": "Model", "skills": "Skills", "provider": "Providers", "tool": "Tools",
         "telegram": "Telegram", "discord": "Discord", "slack": "Slack",
         "whatsapp": "WhatsApp", "email": "Email",
         "mattermost": "Mattermost", "matrix": "Matrix", "gateway": "Gateway",
