@@ -2,3 +2,8 @@ starlette>=0.40.0
 uvicorn>=0.30.0
 jinja2>=3.1.0
 python-multipart>=0.0.9
+
+# Knowledge-base skills (hermes-kb) — used by Edward via /data/.hermes/skills/hermes-kb.
+# Installing on William too is harmless (deps don't activate without the skills dir).
+qdrant-client>=1.10.0
+voyageai>=0.2.0
